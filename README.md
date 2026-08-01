@@ -9,11 +9,11 @@ Pipeline for linear analysis of epileptiform activity from .abf files.
 
 2. Download this repository: **Code → Download ZIP** and unzip
 
-3. **First time only** — double-click `install.bat` and wait for completion
+3. First time launch — double-click `install.bat`
 
 4. Double-click `run.bat` to launch — your browser will open automatically
 
-**Next time** just double-click `run.bat`.
+Next time just double-click `run.bat`.
 
 ## Author
 

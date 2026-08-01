@@ -4,16 +4,17 @@ Pipeline for linear analysis of epileptiform activity from .abf files.
 
 ## Quick Start
 
-1. Install Python from [python.org](https://www.python.org/downloads/)
-2. Download this repository (Code → Download ZIP)
-3. Unzip, open terminal in the folder, run:
-```bash
-pip install -r requirements.txt
-streamlit run app.py --server.maxUploadSize 1000
-```
-4. Open http://localhost:8501 in browser
+1. Install Python from [python.org](https://www.python.org/downloads/)  
+   (check **"Add Python to PATH"** during installation)
 
-Windows users: just double-click run.bat after installing Python and dependencies.
+2. Download this repository: **Code → Download ZIP** and unzip
 
-Author
+3. **First time only** — double-click `install.bat` and wait for completion
+
+4. Double-click `run.bat` to launch — your browser will open automatically
+
+**Next time** just double-click `run.bat`.
+
+## Author
+
 Timur Togochiev, 2026

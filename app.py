@@ -47,16 +47,16 @@ with st.expander("Description"):
         **Tip:** Use the sidebar to customize channel names, colors, and detection parameters.
         """)
     
-    with st.expander("Definitions"):
-        st.markdown("""
-        - **Sweep** — a single continuous recording block (e.g., 5 minutes), analyzed independently
-        - **Ictal event** — a long, high-frequency burst of spikes (seizure-like discharge)
-        - **Interictal spikes** — short, isolated spikes between ictal events (background hyperexcitability)
-        - **Spike** — a sharp, transient deflection above the noise threshold
-        - **Prominence** — how much a peak stands out from surrounding signal
-        - **Threshold (sigma)** — amplitude threshold = sigma × noise level (MAD-based)
-        - **Noise level** — estimated via Median Absolute Deviation (MAD), robust to spikes
-        """)
+with st.expander("Definitions"):
+    st.markdown("""
+    - **Sweep** — a single continuous recording block (e.g., 5 minutes), analyzed independently
+    - **Ictal event** — a long, high-frequency burst of spikes (seizure-like discharge)
+    - **Interictal spikes** — short, isolated spikes between ictal events (background hyperexcitability)
+    - **Spike** — a sharp, transient deflection above the noise threshold
+    - **Prominence** — how much a peak stands out from surrounding signal
+    - **Threshold (sigma)** — amplitude threshold = sigma × noise level (MAD-based)
+    - **Noise level** — estimated via Median Absolute Deviation (MAD), robust to spikes
+    """)
 
 st.markdown("---")
 # ==================== SIDEBAR ====================

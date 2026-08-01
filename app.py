@@ -47,7 +47,8 @@ with st.expander("Description"):
         **Tip:** Use the sidebar to customize channel names, colors, and detection parameters.
         """)
     
-with st.expander("Definitions"):
+    st.markdown("---")
+    st.markdown("**Definitions**")
     st.markdown("""
     - **Sweep** — a single continuous recording block (e.g., 5 minutes), analyzed independently
     - **Ictal event** — a long, high-frequency burst of spikes (seizure-like discharge)

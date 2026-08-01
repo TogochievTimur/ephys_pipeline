@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Timur Togochiev
+
 # FUNCTIONS FOR EPILEPTIFORM ACTIVITY
 
 import numpy as np

@@ -36,11 +36,10 @@ Next time just double-click `run.bat`.
    - Cumulative dynamics
 
 > [!WARNING]
-
 > - This app works with large electrophysiology datasets and requires **8+ GB of RAM**. Make sure your computer has sufficient memory before running.
-> - First launch may take 2-3 minutes (filtering + detection). Subsequent runs are faster.
-> - Works with **.abf files only** (2 channels).
 > - Python 3.13 or later is not yet supported.
+> - First launch may take 2–3 minutes (filtering + detection). Subsequent runs are faster.
+> - Works with **.abf files only** (2 channels).
 
 ## Author
 

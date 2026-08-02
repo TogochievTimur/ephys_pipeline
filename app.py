@@ -300,7 +300,8 @@ if uploaded_file is not None and st.sidebar.button("Run Analysis", type="primary
     
     st.session_state.df_summary = df_summary
     st.session_state.df_ictal = df_ictal
-    st.session_state.detect_sweeps = detect_sweeps
+    st.session_state.detect_sweeps = [[detect_sweeps[i][ch].astype(np.float32) 
+                                       for ch in range(n_channels)] for i in range(n_sweeps)]
     st.session_state.sweeps = [[downsample_for_plot(sweeps[i][ch], time, 10000)[1] 
                                 for ch in range(n_channels)] for i in range(n_sweeps)]
     st.session_state.time = time

@@ -228,10 +228,6 @@ def compute_ictal_stats(events, peak_times):
 def plot_raw_vs_filtered(sweeps, detect_sweeps, 
                          time, sweep_idx, n_channels, labels, title, colors,
                          zoom_start=None, zoom_duration=None, fs=None, dpi=300):
-    """
-    Plot raw vs filtered signals for all channels.
-    Returns fig. If zoom_start and zoom_duration are provided, plot a zoomed version.
-    """
     import matplotlib.colors as mcolors
     
     def shift_color(hex_color, shift):
@@ -266,8 +262,21 @@ def plot_raw_vs_filtered(sweeps, detect_sweeps,
             raw = sweeps[sweep_idx][ch_idx]
             filt = detect_sweeps[sweep_idx][ch_idx]
         
-        t_raw, raw_plot = downsample_for_plot(raw, t, target)
-        t_filt, filt_plot = downsample_for_plot(filt, t, target)
+        if len(raw) > target:
+            step = len(raw) // target
+            raw_plot = raw[::step]
+            t_raw = t[::step]
+        else:
+            raw_plot = raw
+            t_raw = t
+            
+        if len(filt) > target:
+            step = len(filt) // target
+            filt_plot = filt[::step]
+            t_filt = t[::step]
+        else:
+            filt_plot = filt
+            t_filt = t
         
         axes[ch_idx, 0].plot(t_raw, raw_plot, linewidth=0.6, color=colors_raw[ch_idx])
         axes[ch_idx, 0].set_title(f'{labels[ch_idx]} — Raw{zoom_str}')
@@ -285,9 +294,3 @@ def plot_raw_vs_filtered(sweeps, detect_sweeps,
     plt.tight_layout(pad=1.0)
     fig.set_dpi(dpi)
     return fig
-
-def downsample_for_plot(signal, time, target_points=5000):
-    if len(signal) <= target_points:
-        return time, signal
-    step = len(signal) // target_points
-    return time[::step], signal[::step]

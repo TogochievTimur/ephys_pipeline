@@ -7,7 +7,18 @@ import matplotlib.pyplot as plt
 import tempfile
 import seaborn as sns
 import gc
-from functions import load_abf_sweeps, get_channel_labels, create_filters, detect_spikes, find_best_segment_60s
+from functions import (
+    load_abf_sweeps, 
+    get_channel_labels, 
+    create_filters, 
+    detect_spikes, 
+    find_best_segment_60s, 
+    spectrum_db, 
+    lowpass, 
+    plot_raw_vs_filtered, 
+    detect_ictal_events, 
+    compute_ictal_stats
+)
 
 st.set_page_config(
     page_title="Epileptiform Activity Analysis",

@@ -66,11 +66,13 @@ with st.expander("Description"):
     st.markdown("---")
     st.markdown("**Definitions**")
     st.markdown("""
-    - **Sweep** — a single continuous recording block (e.g., 5 minutes), analyzed independently
-    - **Ictal event** — a long, high-frequency burst of spikes (seizure-like discharge)
-    - **Interictal spikes** — short, isolated spikes between ictal events (background hyperexcitability)
-    - **Spike** — a sharp, transient deflection above the noise threshold
-    """)
+        - **EC** — entorhinal cortex, a key brain region involved in generating ictal activity.
+        - **CA1** — hippocampal area Cornu Ammonis 1, the main output region of the hippocampus.
+        - **Sweep** — a single continuous recording block (e.g., 5 minutes), analyzed independently
+        - **Ictal event** — a long, high-frequency burst of spikes (seizure-like discharge)
+        - **Interictal spikes** — short, isolated spikes between ictal events (background hyperexcitability)
+        - **Spike** — a sharp, transient deflection above the noise threshold
+        """)
 
 st.markdown("---")
 
@@ -1290,4 +1292,4 @@ if st.session_state.get("analysis_done", False):
         st.markdown("*For the most detailed view, use the tabs above to explore individual plots interactively.*")
 else:
     if uploaded_file is None:
-        st.markdown("<h3 style='text-align: center; color: gray;'>👈 Upload an .abf file in the sidebar to start</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='text-align: center; color: white;'>Upload an .abf file in the sidebar to start!</h3>", unsafe_allow_html=True)

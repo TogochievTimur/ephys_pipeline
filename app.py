@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import tempfile
 import seaborn as sns
 import gc
+import os
+import shutil
 from functions import (
     load_abf_sweeps, 
     get_channel_labels, 
@@ -73,6 +75,7 @@ with st.expander("Description"):
 st.markdown("---")
 
 st.sidebar.header("Settings")
+st.sidebar.warning("Large files require 8+ GB RAM. Close other applications before running.")
 
 uploaded_file = st.sidebar.file_uploader("Choose .abf file", type=["abf"])
 
@@ -105,7 +108,7 @@ if st.sidebar.button("Reset colors to defaults"):
     st.session_state._reset_colors = True
     st.rerun()
 
-with st.sidebar.expander("⚙️ Advanced settings"):
+with st.sidebar.expander("Advanced settings"):
     st.caption("Tune only if detection fails or plot colors need adjustment. Defaults work for most cases.")
     
     st.markdown("**Plot Colors (ictal/interictal markers)**")
@@ -157,33 +160,17 @@ def load_cached(tmp_path, ch0_name, ch1_name):
         labels = get_channel_labels(n_channels)
     return time, sweeps, fs, n_sweeps, n_channels, labels
 
-@st.cache_resource(show_spinner=False)
-def filter_cached(sweeps_tuple, fs, lowcut, order, q):
-    sweeps = list(sweeps_tuple)
+def process_and_save_to_disk(sweeps, fs, lowcut, order, q, threshold_sigma, 
+                              gap_ch0, gap_ch1, min_duration_ch0, min_duration_ch1,
+                              min_density_ch0, min_density_ch1, max_density, 
+                              prominence_ch0, prominence_ch1, labels, time, n_sweeps, n_channels):
+    
+    data_dir = tempfile.mkdtemp()
+    detect_path = os.path.join(data_dir, 'detect_sweeps.npy')
+    
+    np.save(detect_path, np.zeros((n_sweeps, n_channels, len(sweeps[0][0])), dtype=np.float32))
+    
     filter_both = create_filters(fs, lowcut, 50, order, q)
-    detect_sweeps = []
-    measure_sweeps = []
-    for sweep in sweeps:
-        detect_ch = []
-        measure_ch = []
-        for ch in sweep:
-            d, m = filter_both(ch)
-            detect_ch.append(d)
-            measure_ch.append(m)
-        detect_sweeps.append(detect_ch)
-        measure_sweeps.append(measure_ch)
-    return detect_sweeps, measure_sweeps
-
-@st.cache_data(show_spinner=False)
-def detect_cached(detect_sweeps_tuple, measure_sweeps_tuple, time, fs, n_sweeps, n_channels,
-                  labels_tuple, threshold_sigma, gap_ch0, gap_ch1, min_duration_ch0, min_duration_ch1,
-                  min_density_ch0, min_density_ch1, max_density, prominence_ch0, prominence_ch1):
-    
-    detect_sweeps = list(detect_sweeps_tuple)
-    measure_sweeps = list(measure_sweeps_tuple)
-    labels = list(labels_tuple)
-    
-    from functions import detect_spikes, detect_ictal_events, compute_ictal_stats
     
     CHANNEL_PARAMS = {
         labels[0]: {"gap": gap_ch0, "min_duration": min_duration_ch0, "min_density": min_density_ch0,
@@ -195,10 +182,13 @@ def detect_cached(detect_sweeps_tuple, measure_sweeps_tuple, time, fs, n_sweeps,
     all_results = []
     ictal_rows = []
     
+    detect_array = np.load(detect_path, mmap_mode='r+')
+    
     for sweep_idx in range(n_sweeps):
         for ch_idx in range(n_channels):
-            detect = detect_sweeps[sweep_idx][ch_idx]
-            measure = measure_sweeps[sweep_idx][ch_idx]
+            raw = sweeps[sweep_idx][ch_idx].astype(np.float32)
+            detect, measure = filter_both(raw)
+            detect_array[sweep_idx, ch_idx, :] = detect.astype(np.float32)
             
             channel_name = labels[ch_idx]
             params = CHANNEL_PARAMS[channel_name]
@@ -249,20 +239,26 @@ def detect_cached(detect_sweeps_tuple, measure_sweeps_tuple, time, fs, n_sweeps,
                     'freq_max': ictal_freq_max_list[i], 'freq_min': ictal_freq_min_list[i],
                     'ictal_amplitude': round(ictal_amplitude, 2) if n_ictal > 0 else 0,
                 })
+            
+            del detect, measure, raw, peaks, height
+            gc.collect()
+    
+    del detect_array
+    gc.collect()
     
     df_summary = pd.DataFrame(all_results)
     df_ictal = pd.DataFrame(ictal_rows)
+    
+    if os.path.exists(detect_path):
+        st.session_state.data_dir = data_dir
+        st.session_state.detect_path = detect_path
+        st.session_state.n_sweeps = n_sweeps
+        st.session_state.n_channels = n_channels
+        st.session_state.fs = fs
+    else:
+        st.error("Failed to create detect file!")
+    
     return df_summary, df_ictal
-
-@st.cache_data(show_spinner=False)
-def cached_plot_raw_vs_filtered(sweep_idx, n_channels, labels_tuple, title, colors_tuple, zoom_start=None, zoom_duration=None, fs=None):
-    sweeps = st.session_state.sweeps
-    detect_sweeps = st.session_state.detect_sweeps
-    time = st.session_state.time
-    labels = list(labels_tuple)
-    colors = list(colors_tuple)
-    from functions import plot_raw_vs_filtered
-    return plot_raw_vs_filtered(sweeps, detect_sweeps, time, sweep_idx, n_channels, labels, title, colors, zoom_start=zoom_start, zoom_duration=zoom_duration, fs=fs)
 
 if uploaded_file is not None:
     st.success(f"Loaded: {uploaded_file.name}")
@@ -276,13 +272,21 @@ if uploaded_file is not None and st.sidebar.button("Run Analysis", type="primary
             f.write(uploaded_file.getvalue())
 
         if st.session_state.get("current_file") != uploaded_file.name:
-            load_cached.clear()
-            filter_cached.clear()
-            detect_cached.clear()
+            if 'data_dir' in st.session_state:
+                shutil.rmtree(st.session_state.data_dir, ignore_errors=True)
             st.session_state.current_file = uploaded_file.name
             st.session_state.analysis_done = False
             
         time, sweeps, fs, n_sweeps, n_channels, labels = load_cached(tmp_path, ch0_name, ch1_name)
+        
+        st.session_state.sweeps_raw = [[sweeps[i][ch].astype(np.float32) 
+                                        for ch in range(n_channels)] for i in range(n_sweeps)]
+        st.session_state.time = time
+        st.session_state.fs = fs
+        st.session_state.n_sweeps = n_sweeps
+        st.session_state.n_channels = n_channels
+        st.session_state.labels = labels
+        st.session_state.colors = colors
     
     st.success(f"Loaded: {n_sweeps} sweeps, {n_channels} channels, {fs} Hz")
     
@@ -293,31 +297,18 @@ if uploaded_file is not None and st.sidebar.button("Run Analysis", type="primary
                     "max_density": max_density, "prominence": prominence_ch1}
     }
     
-    with st.spinner("Filtering... (~40-60 sec)"):
-        detect_sweeps, measure_sweeps = filter_cached(tuple(sweeps), fs, lowcut, order, q)
-    
-    st.success("Filtering complete.")
-    gc.collect()
-    
-    with st.spinner("Detecting spikes... (~15-20 sec)"):
-        df_summary, df_ictal = detect_cached(
-            tuple(detect_sweeps), tuple(measure_sweeps), time, fs, n_sweeps, n_channels,
-            tuple(labels), threshold_sigma, gap_ch0, gap_ch1, min_duration_ch0, min_duration_ch1,
-            min_density_ch0, min_density_ch1, max_density, prominence_ch0, prominence_ch1
+    with st.spinner("Processing & filtering... (~60-90 sec)"):
+        df_summary, df_ictal = process_and_save_to_disk(
+            sweeps, fs, lowcut, order, q, threshold_sigma,
+            gap_ch0, gap_ch1, min_duration_ch0, min_duration_ch1,
+            min_density_ch0, min_density_ch1, max_density,
+            prominence_ch0, prominence_ch1, labels, time, n_sweeps, n_channels
         )
     
-    st.success("Detection complete.")
-    gc.collect()
+    st.success("Processing complete.")
     
     st.session_state.df_summary = df_summary
     st.session_state.df_ictal = df_ictal
-    st.session_state.detect_sweeps = [[detect_sweeps[i][ch].astype(np.float32) 
-                                       for ch in range(n_channels)] for i in range(n_sweeps)]
-    st.session_state.sweeps = sweeps
-    st.session_state.time = time
-    st.session_state.fs = fs
-    st.session_state.n_sweeps = n_sweeps
-    st.session_state.n_channels = n_channels
     st.session_state.labels = labels
     st.session_state.colors = colors
     st.session_state.CHANNEL_PARAMS = CHANNEL_PARAMS
@@ -325,14 +316,12 @@ if uploaded_file is not None and st.sidebar.button("Run Analysis", type="primary
     st.session_state.analysis_done = True
     st.session_state.sweep_selector = None
     
-    del sweeps, measure_sweeps
+    del sweeps
     gc.collect()
 
 if st.session_state.get("analysis_done", False):
     df_summary = st.session_state.df_summary
     df_ictal = st.session_state.df_ictal
-    detect_sweeps = st.session_state.detect_sweeps
-    sweeps = st.session_state.sweeps
     time = st.session_state.time
     fs = st.session_state.fs
     n_sweeps = st.session_state.n_sweeps
@@ -342,23 +331,18 @@ if st.session_state.get("analysis_done", False):
     CHANNEL_PARAMS = st.session_state.CHANNEL_PARAMS
     threshold_sigma = st.session_state.threshold_sigma
     
-    for key in ['measure_sweeps', 'current_file_data']:
-        if key in st.session_state:
-            del st.session_state[key]
-    gc.collect()
-    
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["Sweep Inspector", "Time Analysis", "Frequency Analysis", "Cross-correlation", "Summary"])
     
     with tab1:
         st.header("Sweep Inspector")
         st.caption("Quick inspection of any single sweep: filtered signals, detected spikes, and key metrics for both channels.")
-        
+    
         sweep_labels = [f"{i} ({int((i-1)*sweep_duration)}–{int(i*sweep_duration)} min)" for i in range(1, n_sweeps + 1)]
         sweep_to_view = st.selectbox("Sweep number", range(1, n_sweeps + 1), 
                                      index=None, placeholder="Choose a sweep...",
                                      format_func=lambda x: sweep_labels[x-1],
                                      key="sweep_selector")
-        
+    
         if sweep_to_view is not None:
             with st.spinner("Plotting..."):
                 sweep_idx = sweep_to_view - 1
@@ -366,13 +350,16 @@ if st.session_state.get("analysis_done", False):
                 fig.suptitle(f'Sweep {sweep_to_view}', fontsize=25, fontweight='bold')
                 if n_channels == 1:
                     axes = [axes]
-                
+            
+                detect_array = np.load(st.session_state.detect_path, mmap_mode='r')
+            
                 for ch_idx in range(n_channels):
-                    filt = detect_sweeps[sweep_idx][ch_idx]
+                    filt = detect_array[sweep_idx, ch_idx, :]
                     channel_name = labels[ch_idx]
                     params = CHANNEL_PARAMS[channel_name]
                     
-                    peaks, _, _ = detect_spikes(filt, fs, threshold_sigma, prominence_factor=params["prominence"])
+                    peaks, _, _ = detect_spikes(filt, fs, threshold_sigma, 
+                                                 prominence_factor=params["prominence"])
                     
                     summary_row = df_summary[(df_summary['sweep'] == sweep_to_view) & (df_summary['channel'] == channel_name)]
                     ictal_ch = df_ictal[(df_ictal['sweep'] == sweep_to_view) & (df_ictal['channel'] == channel_name)] if not df_ictal.empty else pd.DataFrame()
@@ -380,8 +367,7 @@ if st.session_state.get("analysis_done", False):
                     n_spikes = int(summary_row['n_spikes'].values[0]) if not summary_row.empty else 0
                     
                     ax = axes[ch_idx]
-                    t_plot, f_plot = downsample_for_plot(filt, time)
-                    ax.plot(t_plot, f_plot, linewidth=0.7, color=colors[ch_idx])
+                    ax.plot(time, filt, linewidth=0.7, color=colors[ch_idx])
                     if n_spikes > 0:
                         ax.plot(time[peaks], filt[peaks], 'x', color='red', markersize=4, label='Detected spikes')
                     ax.set_title(f'{channel_name}', fontsize=16)
@@ -398,27 +384,28 @@ if st.session_state.get("analysis_done", False):
                     elif n_spikes > 0:
                         ax.legend(loc='upper right')
                 
+                del detect_array
                 st.pyplot(fig)
                 plt.close(fig)
                 gc.collect()
-            
+        
             st.markdown("---")
             st.markdown(f"**Sweep {sweep_to_view} analytics**")
-            
+        
             total_spikes = 0
             for ch_idx in range(n_channels):
                 channel_name = labels[ch_idx]
                 summary_row = df_summary[(df_summary['sweep'] == sweep_to_view) & (df_summary['channel'] == channel_name)]
                 ictal_ch = df_ictal[(df_ictal['sweep'] == sweep_to_view) & (df_ictal['channel'] == channel_name)] if not df_ictal.empty else pd.DataFrame()
-                
+            
                 n_spikes = int(summary_row['n_spikes'].values[0]) if not summary_row.empty else 0
                 n_ictal = int(summary_row['n_ictal'].values[0]) if not summary_row.empty else 0
                 n_interictal = int(summary_row['n_interictal'].values[0]) if not summary_row.empty else 0
                 mean_amp = float(summary_row['mean_amplitude'].values[0]) if not summary_row.empty else 0
                 total_spikes += n_spikes
-                
+            
                 st.markdown(f"**{channel_name}**")
-                
+            
                 if n_spikes == 0:
                     st.info(f"No spikes detected in {channel_name}.")
                 else:
@@ -427,14 +414,14 @@ if st.session_state.get("analysis_done", False):
                     col2.metric("Ictal events", n_ictal)
                     col3.metric("Interictal spikes", n_interictal)
                     col4.metric("Mean amplitude", f"{mean_amp:.3f} mV")
-                    
+                
                     if n_ictal > 0 and not ictal_ch.empty:
                         total_ictal_dur = ictal_ch['duration'].sum()
                         mean_ictal_freq = ictal_ch['mean_freq'].mean()
                         col5, col6 = st.columns(2)
                         col5.metric("Total ictal duration", f"{total_ictal_dur:.1f} s")
                         col6.metric("Mean ictal frequency", f"{mean_ictal_freq:.1f} Hz")
-            
+        
             if total_spikes == 0:
                 st.info("This sweep has no spikes at all.")
     
@@ -450,29 +437,36 @@ if st.session_state.get("analysis_done", False):
         with subtab0:
             st.caption("Raw and filtered signals overlaid for both channels, with a 10-second zoom into the most prominent ictal event (if any).")
             with st.spinner("Plotting... (~10 sec)"):
+                from functions import plot_raw_vs_filtered as plot_rf
                 ictal_channels = df_summary[df_summary['n_ictal'] > 0]['channel'].unique()
+                sweeps_raw = st.session_state.get('sweeps_raw', None)
+        
+                if sweeps_raw is not None:
+                    detect_array = np.load(st.session_state.detect_path, mmap_mode='r')
+                    if len(ictal_channels) > 0 and not df_ictal.empty:
+                        best_row = df_ictal.loc[df_ictal['duration'].idxmax()]
+                        sweep_idx = int(best_row['sweep']) - 1
+                        ictal_start = best_row['ictal_start']
                 
-                if len(ictal_channels) > 0 and not df_ictal.empty:
-                    best_row = df_ictal.loc[df_ictal['duration'].idxmax()]
-                    sweep_idx = int(best_row['sweep']) - 1
-                    ictal_start = best_row['ictal_start']
-                    
-                    fig1 = cached_plot_raw_vs_filtered(sweep_idx, n_channels, tuple(labels),
-                        f'Comparison of raw and filtered signals - sweep {sweep_idx+1}', tuple(colors))
-                    st.pyplot(fig1)
-                    plt.close(fig1)
-                    
-                    fig2 = cached_plot_raw_vs_filtered(sweep_idx, n_channels, tuple(labels),
-                        f'Comparison of raw and filtered signals - sweep {sweep_idx+1}', tuple(colors),
-                        zoom_start=ictal_start, zoom_duration=10, fs=fs)
-                    st.pyplot(fig2)
-                    plt.close(fig2)
+                        fig1 = plot_rf(sweeps_raw, detect_array, time, sweep_idx, n_channels, labels,
+                                       'Comparison of raw and filtered signals', colors)
+                        st.pyplot(fig1)
+                        plt.close(fig1)
+                
+                        fig2 = plot_rf(sweeps_raw, detect_array, time, sweep_idx, n_channels, labels,
+                                       'Comparison of raw and filtered signals (zoomed)', colors,
+                                       zoom_start=ictal_start, zoom_duration=10, fs=fs)
+                        st.pyplot(fig2)
+                        plt.close(fig2)
+                    else:
+                        sweep_idx = int(df_summary.loc[df_summary['n_interictal'].idxmax()]['sweep']) - 1
+                        fig = plot_rf(sweeps_raw, detect_array, time, sweep_idx, n_channels, labels,
+                                      'Comparison of raw and filtered signals', colors)
+                        st.pyplot(fig)
+                        plt.close(fig)
+                    del detect_array
                 else:
-                    sweep_idx = int(df_summary.loc[df_summary['n_interictal'].idxmax()]['sweep']) - 1
-                    fig = cached_plot_raw_vs_filtered(sweep_idx, n_channels, tuple(labels),
-                        f'Comparison of raw and filtered signals - sweep {sweep_idx+1}', tuple(colors))
-                    st.pyplot(fig)
-                    plt.close(fig)
+                    st.warning("Raw sweeps data not available")
                 gc.collect()
         
         with subtab1:
@@ -498,6 +492,7 @@ if st.session_state.get("analysis_done", False):
                 plt.tight_layout()
                 st.pyplot(fig)
                 plt.close(fig)
+                gc.collect()
         
         with subtab2:
             st.caption("Total ictal duration per sweep for each channel. Skipped if no ictal events were detected.")
@@ -522,6 +517,7 @@ if st.session_state.get("analysis_done", False):
                     plt.tight_layout()
                     st.pyplot(fig)
                     plt.close(fig)
+                    gc.collect()
         
         with subtab3:
             st.caption("Side-by-side comparison of interictal and ictal spike counts per sweep for each channel. Skipped if no ictal events were detected.")
@@ -551,6 +547,7 @@ if st.session_state.get("analysis_done", False):
                     plt.tight_layout()
                     st.pyplot(fig)
                     plt.close(fig)
+                    gc.collect()
         
         with subtab4:
             st.caption("Interictal spike counts per sweep, shown together for both channels to compare activity levels.")
@@ -571,6 +568,7 @@ if st.session_state.get("analysis_done", False):
                 plt.tight_layout()
                 st.pyplot(fig)
                 plt.close(fig)
+                gc.collect()
         
         with subtab5:
             st.caption("Mean spike amplitude per sweep for interictal (line) and ictal (square markers) spikes. Ictal values are shown only for sweeps containing ictal events.")
@@ -601,6 +599,7 @@ if st.session_state.get("analysis_done", False):
                 plt.tight_layout()
                 st.pyplot(fig)
                 plt.close(fig)
+                gc.collect()
         
         with subtab6:
             st.caption("Distribution of mean spike amplitudes across all sweeps for each channel. Boxes represent the interquartile range; dots show individual sweeps.")
@@ -618,6 +617,7 @@ if st.session_state.get("analysis_done", False):
                 plt.tight_layout()
                 st.pyplot(fig)
                 plt.close(fig)
+                gc.collect()
     
     with tab3:
         st.header("Frequency Analysis")
@@ -641,11 +641,12 @@ if st.session_state.get("analysis_done", False):
                 if n_channels_freq == 1:
                     axes = [axes]
                 
+                detect_array = np.load(st.session_state.detect_path, mmap_mode='r')
+                
                 for ax, channel in zip(axes, channels):
                     ch_idx = list(channels).index(channel)
                     
-                    sweep_idx = 0
-                    font_segment = detect_sweeps[sweep_idx][ch_idx][:segment_len]
+                    font_segment = detect_array[0, ch_idx, :segment_len]
                     
                     ictal_segment = None
                     if not df_ictal.empty:
@@ -655,7 +656,7 @@ if st.session_state.get("analysis_done", False):
                             ictal_sweep_idx = int(ictal_row['sweep']) - 1
                             ictal_start = ictal_row['ictal_start']
                             ictal_start_idx = int((ictal_start + 2) * fs)
-                            ictal_segment = detect_sweeps[ictal_sweep_idx][ch_idx][ictal_start_idx:ictal_start_idx + segment_len]
+                            ictal_segment = detect_array[ictal_sweep_idx, ch_idx, ictal_start_idx:ictal_start_idx + segment_len]
                     
                     xf, font_db = spectrum_db(font_segment, fs)
                     
@@ -675,6 +676,8 @@ if st.session_state.get("analysis_done", False):
                 plt.tight_layout()
                 st.pyplot(fig)
                 plt.close(fig)
+                del detect_array
+                gc.collect()
         
         with freq_subtab2:
             st.subheader("Wavelet Analysis of Ictal Discharge")
@@ -700,6 +703,8 @@ if st.session_state.get("analysis_done", False):
                     fig.suptitle('Wavelet transform', fontsize=25, fontweight='bold')
                     axes = axes[0]
                     
+                    detect_array = np.load(st.session_state.detect_path, mmap_mode='r')
+                    
                     for ax, channel in zip(axes, channels_with_ictal):
                         ictal_ch = df_ictal[df_ictal['channel'] == channel]
                         best_row = ictal_ch.loc[ictal_ch['duration'].idxmax()]
@@ -710,7 +715,7 @@ if st.session_state.get("analysis_done", False):
                         
                         start_idx = int((ictal_start - duration_pre) * fs)
                         end_idx = int((ictal_start + duration_post) * fs)
-                        signal_raw = detect_sweeps[sweep_idx][ch_idx][start_idx:end_idx]
+                        signal_raw = detect_array[sweep_idx, ch_idx, start_idx:end_idx]
                         
                         signal = sp.detrend(signal_raw)
                         signal = lowpass(signal, fs, cutoff=40, order=4)
@@ -757,6 +762,7 @@ if st.session_state.get("analysis_done", False):
                     plt.tight_layout()
                     st.pyplot(fig)
                     plt.close(fig)
+                    del detect_array
                     gc.collect()
     
     with tab4:
@@ -781,11 +787,13 @@ if st.session_state.get("analysis_done", False):
             all_lags = None
             good_sweeps = 0
             
+            detect_array = np.load(st.session_state.detect_path, mmap_mode='r')
+            
             for sweep_idx in valid_sweeps['sweep'].values:
                 sweep_idx = int(sweep_idx) - 1
                 
-                sig0_full = detect_sweeps[sweep_idx][0]
-                sig1_full = detect_sweeps[sweep_idx][1]
+                sig0_full = detect_array[sweep_idx, 0, :]
+                sig1_full = detect_array[sweep_idx, 1, :]
                 
                 start_idx, end_idx = find_best_segment_60s(sig0_full, sig1_full, fs, duration=60, step=10)
                 
@@ -832,6 +840,9 @@ if st.session_state.get("analysis_done", False):
                 if all_lags is None:
                     all_lags = lags
                 good_sweeps += 1
+            
+            del detect_array
+            gc.collect()
             
             if good_sweeps < 2:
                 st.warning(f"Insufficient data for cross-correlation averaging. Only {good_sweeps} sweep(s) passed all quality criteria (minimum 2 required).")
@@ -883,6 +894,7 @@ if st.session_state.get("analysis_done", False):
                 plt.tight_layout()
                 st.pyplot(fig)
                 plt.close(fig)
+                gc.collect()
 
                 st.session_state.cross_corr_result = {
                     'good_sweeps': good_sweeps,
@@ -927,7 +939,10 @@ if st.session_state.get("analysis_done", False):
         mean_amp_ch1 = df_summary[df_summary['channel'] == labels[1]]['mean_amplitude'].mean()
         
         has_ictal = len(ictal_sweeps_list) > 0
-        has_artifact = any(np.max(np.abs(sweeps[i][ch])) > 1.5 for i in range(n_sweeps) for ch in range(n_channels))
+        sweeps_raw = st.session_state.get('sweeps_raw', None)
+        has_artifact = False
+        if sweeps_raw is not None:
+            has_artifact = any(np.max(np.abs(sweeps_raw[i][ch])) > 1.5 for i in range(n_sweeps) for ch in range(n_channels))
         
         st.markdown(f"""
         **Analysis of `{uploaded_file.name if uploaded_file else 'your file'}` completed successfully.**
@@ -1009,28 +1024,34 @@ if st.session_state.get("analysis_done", False):
                 if not df_ictal.empty:
                     zip_file.writestr("tables/ictal_events.csv", df_ictal.to_csv(index=False, sep=';', decimal=','))
                 
-                from functions import plot_raw_vs_filtered, spectrum_db, lowpass
+                from functions import plot_raw_vs_filtered as plot_rf, spectrum_db, lowpass
                 
                 ictal_chs = df_summary[df_summary['n_ictal'] > 0]['channel'].unique()
+                sweeps_raw = st.session_state.get('sweeps_raw', None)
+                detect_array = np.load(st.session_state.detect_path, mmap_mode='r')
+                
                 if len(ictal_chs) > 0 and not df_ictal.empty:
                     best_row = df_ictal.loc[df_ictal['duration'].idxmax()]
                     sweep_idx_rf = int(best_row['sweep']) - 1
                     ictal_start = best_row['ictal_start']
-                    fig1 = plot_raw_vs_filtered(sweeps, detect_sweeps, time, sweep_idx_rf, n_channels, labels,
-                                         'Comparison of raw and filtered signals', colors)
+                    fig1 = plot_rf(sweeps_raw, detect_array, time, sweep_idx_rf, n_channels, labels,
+                                   'Comparison of raw and filtered signals', colors)
                     fig1.savefig(zip_file.open('time_plots/raw_vs_filt.png', 'w'), dpi=300, bbox_inches='tight')
                     plt.close(fig1)
-                    fig2 = plot_raw_vs_filtered(sweeps, detect_sweeps, time, sweep_idx_rf, n_channels, labels,
-                                         'Comparison of raw and filtered signals (zoomed)', colors,
-                                         zoom_start=ictal_start, zoom_duration=10, fs=fs)
+                    fig2 = plot_rf(sweeps_raw, detect_array, time, sweep_idx_rf, n_channels, labels,
+                                   'Comparison of raw and filtered signals (zoomed)', colors,
+                                   zoom_start=ictal_start, zoom_duration=10, fs=fs)
                     fig2.savefig(zip_file.open('time_plots/raw_vs_filt_zoom.png', 'w'), dpi=300, bbox_inches='tight')
                     plt.close(fig2)
                 else:
                     sweep_idx_rf = int(df_summary.loc[df_summary['n_interictal'].idxmax()]['sweep']) - 1
-                    fig = plot_raw_vs_filtered(sweeps, detect_sweeps, time, sweep_idx_rf, n_channels, labels,
-                                        'Comparison of raw and filtered signals', colors)
+                    fig = plot_rf(sweeps_raw, detect_array, time, sweep_idx_rf, n_channels, labels,
+                                  'Comparison of raw and filtered signals', colors)
                     fig.savefig(zip_file.open('time_plots/raw_vs_filt.png', 'w'), dpi=300, bbox_inches='tight')
                     plt.close(fig)
+                
+                del detect_array
+                gc.collect()
                 
                 sweep_labels_exp = [f"{int((i-1)*sweep_duration)}-{int(i*sweep_duration)}" for i in range(1, n_sweeps + 1)]
                 data_exp = df_summary[df_summary['sweep'] >= 2]
@@ -1049,6 +1070,7 @@ if st.session_state.get("analysis_done", False):
                 plt.tight_layout()
                 fig.savefig(zip_file.open('time_plots/spike_count.png', 'w'), dpi=300, bbox_inches='tight')
                 plt.close(fig)
+                gc.collect()
                 
                 if len(ictal_chs) > 0 and not df_ictal.empty:
                     n_plots = len(ictal_chs)
@@ -1069,6 +1091,7 @@ if st.session_state.get("analysis_done", False):
                     plt.tight_layout()
                     fig.savefig(zip_file.open('time_plots/ictal_duration.png', 'w'), dpi=300, bbox_inches='tight')
                     plt.close(fig)
+                    gc.collect()
                 
                 channels_with_ictal_exp = df_summary[df_summary['n_ictal'] > 0]['channel'].unique()
                 channels_to_plot_exp = channels_with_ictal_exp if len(channels_with_ictal_exp) > 0 else []
@@ -1095,6 +1118,7 @@ if st.session_state.get("analysis_done", False):
                     plt.tight_layout()
                     fig.savefig(zip_file.open('time_plots/ictal_vs_interictal.png', 'w'), dpi=300, bbox_inches='tight')
                     plt.close(fig)
+                    gc.collect()
                 
                 channels_exp = df_summary['channel'].unique()
                 fig, ax = plt.subplots(figsize=(16, 6))
@@ -1112,6 +1136,7 @@ if st.session_state.get("analysis_done", False):
                 plt.tight_layout()
                 fig.savefig(zip_file.open('time_plots/interictal_count.png', 'w'), dpi=300, bbox_inches='tight')
                 plt.close(fig)
+                gc.collect()
                 
                 fig, axes = plt.subplots(len(channels_exp), 1, figsize=(16, 6 * len(channels_exp)))
                 fig.suptitle('Spike amplitudes', fontsize=25, fontweight='bold')
@@ -1138,6 +1163,7 @@ if st.session_state.get("analysis_done", False):
                 plt.tight_layout()
                 fig.savefig(zip_file.open('time_plots/spike_amplitudes.png', 'w'), dpi=300, bbox_inches='tight')
                 plt.close(fig)
+                gc.collect()
                 
                 data_for_box_exp = df_summary[df_summary['mean_amplitude'] > 0]
                 palette_exp = {ch: colors[i] for i, ch in enumerate(channels_exp)}
@@ -1151,15 +1177,19 @@ if st.session_state.get("analysis_done", False):
                 plt.tight_layout()
                 fig.savefig(zip_file.open('time_plots/amplitude_boxplot.png', 'w'), dpi=300, bbox_inches='tight')
                 plt.close(fig)
+                gc.collect()
                 
                 channels_freq = df_summary['channel'].unique()
                 fig, axes = plt.subplots(len(channels_freq), 1, figsize=(16, 6 * len(channels_freq)))
                 fig.suptitle('Spectral power', fontsize=25, fontweight='bold')
                 if len(channels_freq) == 1:
                     axes = [axes]
+                
+                detect_array_freq = np.load(st.session_state.detect_path, mmap_mode='r')
+                
                 for ax, channel in zip(axes, channels_freq):
                     ch_idx = list(channels_freq).index(channel)
-                    font_segment = detect_sweeps[0][ch_idx][:int(10 * fs)]
+                    font_segment = detect_array_freq[0, ch_idx, :int(10 * fs)]
                     xf, font_db = spectrum_db(font_segment, fs)
                     ax.plot(xf, font_db, label='Background', color='#8c9aa6')
                     if not df_ictal.empty:
@@ -1169,7 +1199,7 @@ if st.session_state.get("analysis_done", False):
                             ictal_sweep_idx = int(ictal_row['sweep']) - 1
                             ictal_start_f = ictal_row['ictal_start']
                             ictal_start_idx_f = int((ictal_start_f + 2) * fs)
-                            ictal_segment = detect_sweeps[ictal_sweep_idx][ch_idx][ictal_start_idx_f:ictal_start_idx_f + int(10 * fs)]
+                            ictal_segment = detect_array_freq[ictal_sweep_idx, ch_idx, ictal_start_idx_f:ictal_start_idx_f + int(10 * fs)]
                             _, ictal_db = spectrum_db(ictal_segment, fs)
                             ax.plot(xf, ictal_db, label='Ictal', color='#2B6E7A' if ch_idx == 0 else '#D97A5C', linewidth=1.5)
                     ax.set_xlim(0, 25)
@@ -1181,6 +1211,8 @@ if st.session_state.get("analysis_done", False):
                 plt.tight_layout()
                 fig.savefig(zip_file.open('freq_plots/spectral_power.png', 'w'), dpi=300, bbox_inches='tight')
                 plt.close(fig)
+                del detect_array_freq
+                gc.collect()
                 
                 if len(ictal_chs) > 0 and not df_ictal.empty:
                     from scipy.ndimage import gaussian_filter
@@ -1193,6 +1225,9 @@ if st.session_state.get("analysis_done", False):
                     fig, axes = plt.subplots(1, len(ictal_chs), figsize=(8 * len(ictal_chs), 6), squeeze=False)
                     fig.suptitle('Wavelet transform', fontsize=25, fontweight='bold')
                     axes = axes[0]
+                    
+                    detect_array_wavelet = np.load(st.session_state.detect_path, mmap_mode='r')
+                    
                     for ax, channel in zip(axes, ictal_chs):
                         ictal_ch_w = df_ictal[df_ictal['channel'] == channel]
                         best_row_w = ictal_ch_w.loc[ictal_ch_w['duration'].idxmax()]
@@ -1201,7 +1236,7 @@ if st.session_state.get("analysis_done", False):
                         ch_idx_w = list(labels).index(channel)
                         start_idx_w = int((ictal_start_w - duration_pre) * fs)
                         end_idx_w = int((ictal_start_w + duration_post) * fs)
-                        signal_raw = detect_sweeps[sweep_idx_w][ch_idx_w][start_idx_w:end_idx_w]
+                        signal_raw = detect_array_wavelet[sweep_idx_w, ch_idx_w, start_idx_w:end_idx_w]
                         signal = sp.detrend(signal_raw)
                         signal = lowpass(signal, fs, cutoff=40, order=4)
                         signal_down = sp.decimate(signal, downsample_factor, ftype='fir', zero_phase=False)
@@ -1228,9 +1263,15 @@ if st.session_state.get("analysis_done", False):
                     plt.tight_layout()
                     fig.savefig(zip_file.open('freq_plots/wavelet.png', 'w'), dpi=150, bbox_inches='tight')
                     plt.close(fig)
+                    del detect_array_wavelet
+                    gc.collect()
                 
                 if 'cross_corr_fig' in st.session_state:
                     st.session_state.cross_corr_fig.savefig(zip_file.open('corr/cross_correlation.png', 'w'), dpi=300, bbox_inches='tight')
+                    plt.close(st.session_state.cross_corr_fig)
+                
+                plt.close('all')
+                gc.collect()
             
             zip_buffer.seek(0)
         

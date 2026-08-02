@@ -21,14 +21,20 @@ Next time just double-click `run.bat`.
 
 ## Description
 
-**Key Features**
-        - Supports 2-channel .abf recordings
-        - Spike detection (ictal & interictal)
-        - Spectral analysis (FFT + wavelet)
-        - Cross-correlation between channels
-        - Intra-sweep dynamics
-        - Cumulative dynamics
-        """)
+**Key Features:**
+
+   - Supports 2-channel .abf recordings
+        
+   - Spike detection (ictal & interictal)
+        
+   - Spectral analysis (FFT + wavelet)
+        
+   - Cross-correlation between channels
+        
+   - Intra-sweep dynamics
+        
+   - Cumulative dynamics
+
 
 ## Author
 

@@ -28,8 +28,10 @@ with st.expander("Description"):
         - Spike detection (ictal & interictal)
         - Spectral analysis (FFT + wavelet)
         - Cross-correlation between channels
-        - Sweep-by-sweep dynamics
-        - Automatic visualizations & CSV export
+        - Intra-sweep dynamics
+        - Cumulative dynamics
+        - Full overview of results
+        - Export: .CSV & .PNG
         """)
     with col2:
         st.markdown("""
@@ -42,7 +44,7 @@ with st.expander("Description"):
             - **Time Analysis** — spike counts, amplitudes, distributions
             - **Frequency Analysis** — FFT & wavelet spectrograms
             - **Cross-correlation** — channel coupling
-            - **Summary** — data tables & export
+            - **Summary** — overview & export
         
         **Tip:** Use the sidebar to customize channel names, colors, and detection parameters.
         """)
@@ -54,9 +56,6 @@ with st.expander("Description"):
     - **Ictal event** — a long, high-frequency burst of spikes (seizure-like discharge)
     - **Interictal spikes** — short, isolated spikes between ictal events (background hyperexcitability)
     - **Spike** — a sharp, transient deflection above the noise threshold
-    - **Prominence** — how much a peak stands out from surrounding signal
-    - **Threshold (sigma)** — amplitude threshold = sigma × noise level (MAD-based)
-    - **Noise level** — estimated via Median Absolute Deviation (MAD), robust to spikes
     """)
 
 st.markdown("---")

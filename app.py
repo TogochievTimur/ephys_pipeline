@@ -109,7 +109,7 @@ if st.sidebar.button("Reset colors to defaults"):
     st.rerun()
 
 with st.sidebar.expander("Advanced settings"):
-    st.caption("Tune only if detection fails or plot colors need adjustment. Defaults work for most cases.")
+    st.warning("⚠️ These settings are pre-tuned for typical recordings. Change only if detection fails or you know what you're doing.")
     
     st.markdown("**Plot Colors (ictal/interictal markers)**")
     st.caption("Change only if default colors are hard to distinguish.")

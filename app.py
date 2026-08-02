@@ -1050,9 +1050,9 @@ if st.session_state.get("analysis_done", False):
             
             zip_buffer = io.BytesIO()
             with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-                zip_file.writestr("tables/sweep_summary.csv", df_summary.to_csv(index=False))
+                zip_file.writestr("tables/sweep_summary.csv", df_summary.to_csv(index=False, sep=';', decimal=','))
                 if not df_ictal.empty:
-                    zip_file.writestr("tables/ictal_events.csv", df_ictal.to_csv(index=False))
+                    zip_file.writestr("tables/ictal_events.csv", df_summary.to_csv(index=False, sep=';', decimal=','))
                     
                     from functions import plot_raw_vs_filtered, spectrum_db, lowpass
                     

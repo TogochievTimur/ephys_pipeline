@@ -224,7 +224,7 @@ def compute_ictal_stats(events, peak_times):
             freq_maxs.append(round(freq, 2))
             freq_mins.append(round(freq, 2))
 
-    return starts, durations, peak_counts, mean_freqs, freq_maxs, freq_min
+    return starts, durations, peak_counts, mean_freqs, freq_maxs, freq_mins
 
 def plot_raw_vs_filtered(sweeps, detect_sweeps, 
                          time, sweep_idx, n_channels, labels, title, colors,

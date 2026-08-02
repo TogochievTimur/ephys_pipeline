@@ -286,7 +286,8 @@ if uploaded_file is not None and st.sidebar.button("Run Analysis", type="primary
         detect_sweeps, measure_sweeps = filter_cached(tuple(sweeps), fs, lowcut, order, q)
     
     st.success("Filtering complete.")
-
+    gc.collect()
+    
     with st.spinner("Detecting spikes... (~15-20 sec)"):
         df_summary, df_ictal = detect_cached(
             tuple(detect_sweeps), tuple(measure_sweeps), time, fs, n_sweeps, n_channels,
@@ -295,6 +296,7 @@ if uploaded_file is not None and st.sidebar.button("Run Analysis", type="primary
         )
     
     st.success("Detection complete.")
+    gc.collect()
     
     st.session_state.df_summary = df_summary
     st.session_state.df_ictal = df_ictal

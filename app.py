@@ -302,9 +302,8 @@ if uploaded_file is not None and st.sidebar.button("Run Analysis", type="primary
     st.session_state.df_ictal = df_ictal
     st.session_state.detect_sweeps = [[detect_sweeps[i][ch].astype(np.float32) 
                                        for ch in range(n_channels)] for i in range(n_sweeps)]
-    st.session_state.sweeps = [[sweeps[i][ch][::len(sweeps[i][ch])//10000] 
-                                for ch in range(n_channels)] for i in range(n_sweeps)]
-    st.session_state.time = time[::len(time)//10000]
+    st.session_state.sweeps = sweeps
+    st.session_state.time = time
     st.session_state.fs = fs
     st.session_state.n_sweeps = n_sweeps
     st.session_state.n_channels = n_channels

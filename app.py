@@ -366,7 +366,8 @@ if st.session_state.get("analysis_done", False):
                     n_spikes = int(summary_row['n_spikes'].values[0]) if not summary_row.empty else 0
                     
                     ax = axes[ch_idx]
-                    ax.plot(time, filt, linewidth=0.7, color=colors[ch_idx])
+                    t_plot, f_plot = downsample_for_plot(filt, time)
+                    ax.plot(t_plot, f_plot, linewidth=0.7, color=colors[ch_idx])
                     if n_spikes > 0:
                         ax.plot(time[peaks], filt[peaks], 'x', color='red', markersize=4, label='Detected spikes')
                     ax.set_title(f'{channel_name}', fontsize=16)

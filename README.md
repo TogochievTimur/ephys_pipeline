@@ -17,6 +17,9 @@ Pipeline for linear analysis of epileptiform activity from .abf files.
 
 Next time just double-click `run.bat`.
 
+<img width="238" height="294" alt="image" src="https://github.com/user-attachments/assets/c98086fe-d2a6-4cfe-bfc8-c2ddbcc04164" />
+
+
 ## Author
 
 Timur Togochiev, 2026

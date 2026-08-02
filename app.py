@@ -1050,9 +1050,9 @@ if st.session_state.get("analysis_done", False):
             
             zip_buffer = io.BytesIO()
             with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-                zip_file.writestr("sweep_summary.csv", df_summary.to_csv(index=False))
+                zip_file.writestr("tables/sweep_summary.csv", df_summary.to_csv(index=False))
                 if not df_ictal.empty:
-                    zip_file.writestr("ictal_events.csv", df_ictal.to_csv(index=False))
+                    zip_file.writestr("tables/ictal_events.csv", df_ictal.to_csv(index=False))
                     
                     from functions import plot_raw_vs_filtered, spectrum_db, lowpass
                     
@@ -1064,18 +1064,18 @@ if st.session_state.get("analysis_done", False):
                         ictal_start = best_row['ictal_start']
                         fig1 = plot_raw_vs_filtered(sweeps, detect_sweeps, time, sweep_idx_rf, n_channels, labels,
                                              'Comparison of raw and filtered signals', colors)
-                        fig1.savefig(zip_file.open('raw_vs_filt.png', 'w'), dpi=300, bbox_inches='tight')
+                        fig1.savefig(zip_file.open('time_plots/raw_vs_filt.png', 'w'), dpi=300, bbox_inches='tight')
                         plt.close(fig1)
                         fig2 = plot_raw_vs_filtered(sweeps, detect_sweeps, time, sweep_idx_rf, n_channels, labels,
                                              'Comparison of raw and filtered signals (zoomed)', colors,
                                              zoom_start=ictal_start, zoom_duration=10, fs=fs)
-                        fig2.savefig(zip_file.open('raw_vs_filt_zoom.png', 'w'), dpi=300, bbox_inches='tight')
+                        fig2.savefig(zip_file.open('time_plots/raw_vs_filt_zoom.png', 'w'), dpi=300, bbox_inches='tight')
                         plt.close(fig2)
                     else:
                         sweep_idx_rf = int(df_summary.loc[df_summary['n_interictal'].idxmax()]['sweep']) - 1
                         fig = plot_raw_vs_filtered(sweeps, detect_sweeps, time, sweep_idx_rf, n_channels, labels,
                                             'Comparison of raw and filtered signals', colors)
-                        fig.savefig(zip_file.open('raw_vs_filt.png', 'w'), dpi=300, bbox_inches='tight')
+                        fig.savefig(zip_file.open('time_plots/raw_vs_filt.png', 'w'), dpi=300, bbox_inches='tight')
                         plt.close(fig)
                     
                     # Spike count
@@ -1094,7 +1094,7 @@ if st.session_state.get("analysis_done", False):
                     ax.grid(True, alpha=0.3)
                     ax.set_xlim(1.5, n_sweeps + 0.5)
                     plt.tight_layout()
-                    fig.savefig(zip_file.open('spike_count.png', 'w'), dpi=300, bbox_inches='tight')
+                    fig.savefig(zip_file.open('time_plots/spike_count.png', 'w'), dpi=300, bbox_inches='tight')
                     plt.close(fig)
                     
                     # Ictal duration
@@ -1115,7 +1115,7 @@ if st.session_state.get("analysis_done", False):
                             ax.set_title(f'{channel}')
                             ax.set_xlim(1.5, n_sweeps + 0.5)
                         plt.tight_layout()
-                        fig.savefig(zip_file.open('ictal_duration.png', 'w'), dpi=300, bbox_inches='tight')
+                        fig.savefig(zip_file.open('time_plots/ictal_duration.png', 'w'), dpi=300, bbox_inches='tight')
                         plt.close(fig)
                     
                     # Ictal vs Interictal
@@ -1142,7 +1142,7 @@ if st.session_state.get("analysis_done", False):
                             ax.set_title(f'{channel}')
                             ax.legend()
                         plt.tight_layout()
-                        fig.savefig(zip_file.open('ictal_vs_interictal.png', 'w'), dpi=300, bbox_inches='tight')
+                        fig.savefig(zip_file.open('time_plots/ictal_vs_interictal.png', 'w'), dpi=300, bbox_inches='tight')
                         plt.close(fig)
                     
                     # Interictal comparison
@@ -1160,7 +1160,7 @@ if st.session_state.get("analysis_done", False):
                     ax.legend()
                     ax.set_xlim(1.5, n_sweeps + 0.5)
                     plt.tight_layout()
-                    fig.savefig(zip_file.open('interictal_count.png', 'w'), dpi=300, bbox_inches='tight')
+                    fig.savefig(zip_file.open('time_plots/interictal_count.png', 'w'), dpi=300, bbox_inches='tight')
                     plt.close(fig)
                     
                     # Amplitudes
@@ -1187,7 +1187,7 @@ if st.session_state.get("analysis_done", False):
                         ax.grid(True, alpha=0.3)
                         ax.legend()
                     plt.tight_layout()
-                    fig.savefig(zip_file.open('spike_amplitudes.png', 'w'), dpi=300, bbox_inches='tight')
+                    fig.savefig(zip_file.open('time_plots/spike_amplitudes.png', 'w'), dpi=300, bbox_inches='tight')
                     plt.close(fig)
                     
                     # Distribution
@@ -1201,7 +1201,7 @@ if st.session_state.get("analysis_done", False):
                     ax.set_xlabel('Channel')
                     ax.grid(True, alpha=0.3)
                     plt.tight_layout()
-                    fig.savefig(zip_file.open('amplitude_boxplot.png', 'w'), dpi=300, bbox_inches='tight')
+                    fig.savefig(zip_file.open('time_plots/amplitude_boxplot.png', 'w'), dpi=300, bbox_inches='tight')
                     plt.close(fig)
                     
                     # Spectral power
@@ -1232,7 +1232,7 @@ if st.session_state.get("analysis_done", False):
                         ax.grid(True, alpha=0.3)
                         ax.legend(loc='lower left')
                     plt.tight_layout()
-                    fig.savefig(zip_file.open('spectral_power.png', 'w'), dpi=300, bbox_inches='tight')
+                    fig.savefig(zip_file.open('freq_plots/spectral_power.png', 'w'), dpi=300, bbox_inches='tight')
                     plt.close(fig)
                     
                     # Wavelet
@@ -1280,12 +1280,12 @@ if st.session_state.get("analysis_done", False):
                             ax.set_ylabel('Frequency (Hz)')
                             ax.set_title(f'{channel} — sweep {sweep_idx_w + 1}')
                         plt.tight_layout()
-                        fig.savefig(zip_file.open('wavelet.png', 'w'), dpi=150, bbox_inches='tight')
+                        fig.savefig(zip_file.open('freq_plots/wavelet.png', 'w'), dpi=150, bbox_inches='tight')
                         plt.close(fig)
                     
                     # Cross-correlation
                     if 'cross_corr_fig' in st.session_state:
-                        st.session_state.cross_corr_fig.savefig(zip_file.open('cross_correlation.png', 'w'), dpi=300, bbox_inches='tight')
+                        st.session_state.cross_corr_fig.savefig(zip_file.open('corr/cross_correlation.png', 'w'), dpi=300, bbox_inches='tight')
                 
                 zip_buffer.seek(0)
         

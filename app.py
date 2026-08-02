@@ -270,7 +270,7 @@ if uploaded_file is not None and st.sidebar.button("Run Analysis", type="primary
             detect_cached.clear()
             st.session_state.current_file = uploaded_file.name
             st.session_state.analysis_done = False
-        
+            
         time, sweeps, fs, n_sweeps, n_channels, labels = load_cached(tmp_path, ch0_name, ch1_name)
     
     st.success(f"Loaded: {n_sweeps} sweeps, {n_channels} channels, {fs} Hz")
@@ -299,7 +299,8 @@ if uploaded_file is not None and st.sidebar.button("Run Analysis", type="primary
     st.session_state.df_summary = df_summary
     st.session_state.df_ictal = df_ictal
     st.session_state.detect_sweeps = detect_sweeps
-    st.session_state.sweeps = sweeps
+    st.session_state.sweeps = [[downsample_for_plot(sweeps[i][ch], time, 10000)[1] 
+                                for ch in range(n_channels)] for i in range(n_sweeps)]
     st.session_state.time = time
     st.session_state.fs = fs
     st.session_state.n_sweeps = n_sweeps
@@ -311,7 +312,7 @@ if uploaded_file is not None and st.sidebar.button("Run Analysis", type="primary
     st.session_state.analysis_done = True
     st.session_state.sweep_selector = None
     
-    del measure_sweeps
+    del sweeps, measure_sweeps
     gc.collect()
 
 if st.session_state.get("analysis_done", False):

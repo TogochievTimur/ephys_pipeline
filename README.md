@@ -9,7 +9,7 @@ Pipeline for linear analysis of epileptiform activity from .abf files.
    - **macOS:** [python-3.12.7-macos11.pkg](https://www.python.org/ftp/python/3.12.7/python-3.12.7-macos11.pkg)
    - Check **"Add Python to PATH"** during installation
 
-2. Download this repository: **Code → Download ZIP** and unzip
+2. Download this repository: **Code → Download ZIP** and extract the folder
 
 3. **First time only** — double-click `install.bat`
 

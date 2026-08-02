@@ -249,9 +249,11 @@ def plot_raw_vs_filtered(sweeps, detect_sweeps,
         end_idx = int((zoom_start + zoom_duration) * fs)
         t = time[start_idx:end_idx]
         zoom_str = ' (zoomed)'
+        target = 5000
     else:
         t = time
         zoom_str = ''
+        target = 10000
     
     fig, axes = plt.subplots(n_channels, 2, figsize=(16, 8))
     fig.suptitle(f'{title}{zoom_str}', fontsize=20, fontweight='bold')
@@ -264,12 +266,15 @@ def plot_raw_vs_filtered(sweeps, detect_sweeps,
             raw = sweeps[sweep_idx][ch_idx]
             filt = detect_sweeps[sweep_idx][ch_idx]
         
-        axes[ch_idx, 0].plot(t, raw, linewidth=0.6, color=colors_raw[ch_idx])
+        t_raw, raw_plot = downsample_for_plot(raw, t, target)
+        t_filt, filt_plot = downsample_for_plot(filt, t, target)
+        
+        axes[ch_idx, 0].plot(t_raw, raw_plot, linewidth=0.6, color=colors_raw[ch_idx])
         axes[ch_idx, 0].set_title(f'{labels[ch_idx]} — Raw{zoom_str}')
         axes[ch_idx, 0].set_ylabel('mV')
         axes[ch_idx, 0].grid(True, alpha=0.3)
         
-        axes[ch_idx, 1].plot(t, filt, linewidth=0.8, color=colors_filt[ch_idx])
+        axes[ch_idx, 1].plot(t_filt, filt_plot, linewidth=0.8, color=colors_filt[ch_idx])
         axes[ch_idx, 1].set_title(f'{labels[ch_idx]} — Filtered{zoom_str}')
         axes[ch_idx, 1].set_ylabel('mV')
         axes[ch_idx, 1].grid(True, alpha=0.3)
@@ -277,6 +282,12 @@ def plot_raw_vs_filtered(sweeps, detect_sweeps,
     axes[-1, 0].set_xlabel('Time (s)')
     axes[-1, 1].set_xlabel('Time (s)')
     
-    plt.tight_layout(pad = 1.0)
+    plt.tight_layout(pad=1.0)
     fig.set_dpi(dpi)
     return fig
+
+def downsample_for_plot(signal, time, target_points=5000):
+    if len(signal) <= target_points:
+        return time, signal
+    step = len(signal) // target_points
+    return time[::step], signal[::step]

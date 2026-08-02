@@ -90,7 +90,7 @@ with col2:
     color_ch1 = st.color_picker("ch1", 
         st.session_state.get("color_ch1", "#2ca02c"), key="color_ch1")
 
-if st.sidebar.button("🔄 Reset colors to defaults"):
+if st.sidebar.button("Reset colors to defaults"):
     st.session_state._reset_colors = True
     st.rerun()
 

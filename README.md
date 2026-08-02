@@ -1,4 +1,4 @@
-# 🧠 Epileptiform Activity Analysis
+# Epileptiform Activity Analysis
 
 Pipeline for linear analysis of epileptiform activity from .abf files.
 

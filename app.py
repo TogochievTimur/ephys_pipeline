@@ -485,7 +485,7 @@ if st.session_state.get("analysis_done", False):
     
     with tab2:
         st.header("Time Analysis")
-        st.caption("Sweep-by-sweep and cumulative dynamics: signal comparison, ictal & interictal analysis, and amplitude distributions.")
+        st.caption("Sweep-by-sweep and cumulative dynamics: signal comparison, ictal & interictal analysis, and amplitude distributions. Sweep 1 (0-5 min) supposed to be non-active")
         
         subtab0, subtab1, subtab2, subtab3, subtab4, subtab5, subtab6 = st.tabs([
             "Raw vs Filtered", "Spike Count", "Ictal Duration", 

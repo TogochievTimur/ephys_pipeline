@@ -1,4 +1,4 @@
-matplotlib==3.9.2
+matplotlib==3.9.3
 numpy==1.26.4
 pandas==2.2.2
 pyabf==2.3.8

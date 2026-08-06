@@ -247,13 +247,11 @@ def plot_raw_vs_filtered(sweeps, detect_sweeps,
         start_idx = int(zoom_start * fs)
         end_idx = int((zoom_start + zoom_duration) * fs)
         t = time[start_idx:end_idx]
-        zoom_str = ' (zoomed)'
     else:
         t = time
-        zoom_str = ''
     
     fig, axes = plt.subplots(n_channels, 2, figsize=(16, 8))
-    fig.suptitle(f'{title}{zoom_str}', fontsize=20, fontweight='bold')
+    fig.suptitle(f'{title}', fontsize=20, fontweight='bold')
     
     for ch_idx in range(n_channels):
         if zoom_start is not None and zoom_duration is not None and fs is not None:
@@ -264,12 +262,12 @@ def plot_raw_vs_filtered(sweeps, detect_sweeps,
             filt = detect_sweeps[sweep_idx][ch_idx]
         
         axes[ch_idx, 0].plot(t, raw, linewidth=0.6, color=colors_raw[ch_idx])
-        axes[ch_idx, 0].set_title(f'{labels[ch_idx]} — Raw{zoom_str}')
+        axes[ch_idx, 0].set_title(f'{labels[ch_idx]} — Raw')
         axes[ch_idx, 0].set_ylabel('mV')
         axes[ch_idx, 0].grid(True, alpha=0.3)
         
         axes[ch_idx, 1].plot(t, filt, linewidth=0.8, color=colors_filt[ch_idx])
-        axes[ch_idx, 1].set_title(f'{labels[ch_idx]} — Filtered{zoom_str}')
+        axes[ch_idx, 1].set_title(f'{labels[ch_idx]} — Filtered')
         axes[ch_idx, 1].set_ylabel('mV')
         axes[ch_idx, 1].grid(True, alpha=0.3)
     

@@ -9,18 +9,7 @@ import seaborn as sns
 import gc
 import os
 import shutil
-from functions import (
-    load_abf_sweeps, 
-    get_channel_labels, 
-    create_filters, 
-    detect_spikes, 
-    find_best_segment_60s, 
-    spectrum_db, 
-    lowpass, 
-    plot_raw_vs_filtered, 
-    detect_ictal_events, 
-    compute_ictal_stats
-)
+import functions
 
 st.set_page_config(
     page_title="Epileptiform Activity Analysis",
@@ -155,11 +144,11 @@ sweep_duration = 5
 
 @st.cache_resource(show_spinner=False)
 def load_cached(tmp_path, ch0_name, ch1_name):
-    time, sweeps, fs, n_sweeps, n_channels = load_abf_sweeps(tmp_path)
+    time, sweeps, fs, n_sweeps, n_channels = functions.load_abf_sweeps(tmp_path)
     if ch0_name.strip():
         labels = [ch0_name.strip(), ch1_name.strip()]
     else:
-        labels = get_channel_labels(n_channels)
+        labels = functions.get_channel_labels(n_channels)
     return time, sweeps, fs, n_sweeps, n_channels, labels
 
 def process_and_save_to_disk(sweeps, fs, lowcut, order, q, threshold_sigma, 
@@ -172,7 +161,7 @@ def process_and_save_to_disk(sweeps, fs, lowcut, order, q, threshold_sigma,
     
     np.save(detect_path, np.zeros((n_sweeps, n_channels, len(sweeps[0][0])), dtype=np.float32))
     
-    filter_both = create_filters(fs, lowcut, 50, order, q)
+    filter_both = functions.create_filters(fs, lowcut, 50, order, q)
     
     CHANNEL_PARAMS = {
         labels[0]: {"gap": gap_ch0, "min_duration": min_duration_ch0, "min_density": min_density_ch0,
@@ -195,11 +184,11 @@ def process_and_save_to_disk(sweeps, fs, lowcut, order, q, threshold_sigma,
             channel_name = labels[ch_idx]
             params = CHANNEL_PARAMS[channel_name]
             
-            peaks, height, noise = detect_spikes(detect, fs, threshold_sigma,
+            peaks, height, noise = functions.detect_spikes(detect, fs, threshold_sigma,
                                                   prominence_factor=params["prominence"])
             peak_times = time[peaks]
             
-            events, interictal = detect_ictal_events(peak_times,
+            events, interictal = functions.detect_ictal_events(peak_times,
                 gap=params["gap"], min_duration=params["min_duration"],
                 min_density=params["min_density"], max_density=params["max_density"])
             
@@ -217,7 +206,7 @@ def process_and_save_to_disk(sweeps, fs, lowcut, order, q, threshold_sigma,
             
             interictal_amplitude = np.mean(np.abs(measure[peaks][interictal])) if n_interictal > 0 else 0
             
-            ictal_starts, ictal_durations, ictal_peaks_counts, ictal_freqs, ictal_freq_max_list, ictal_freq_min_list = compute_ictal_stats(events, peak_times)
+            ictal_starts, ictal_durations, ictal_peaks_counts, ictal_freqs, ictal_freq_max_list, ictal_freq_min_list = functions.compute_ictal_stats(events, peak_times)
             
             if n_interictal > 0 and len(interictal) > 1:
                 interictal_dur = peak_times[interictal[-1]] - peak_times[interictal[0]]
@@ -360,7 +349,7 @@ if st.session_state.get("analysis_done", False):
                     channel_name = labels[ch_idx]
                     params = CHANNEL_PARAMS[channel_name]
                     
-                    peaks, _, _ = detect_spikes(filt, fs, threshold_sigma, 
+                    peaks, _, _ = functions.detect_spikes(filt, fs, threshold_sigma, 
                                                  prominence_factor=params["prominence"])
                     
                     summary_row = df_summary[(df_summary['sweep'] == sweep_to_view) & (df_summary['channel'] == channel_name)]
@@ -660,12 +649,12 @@ if st.session_state.get("analysis_done", False):
                             ictal_start_idx = int((ictal_start + 2) * fs)
                             ictal_segment = detect_array[ictal_sweep_idx, ch_idx, ictal_start_idx:ictal_start_idx + segment_len]
                     
-                    xf, font_db = spectrum_db(font_segment, fs)
+                    xf, font_db = functions.spectrum_db(font_segment, fs)
                     
                     ax.plot(xf, font_db, label='Background', color='#8c9aa6')
                     
                     if ictal_segment is not None:
-                        _, ictal_db = spectrum_db(ictal_segment, fs)
+                        _, ictal_db = functions.spectrum_db(ictal_segment, fs)
                         ax.plot(xf, ictal_db, label='Ictal', color='#2B6E7A' if ch_idx == 0 else '#D97A5C', linewidth=1.5)
                     
                     ax.set_xlim(0, 25)
@@ -720,7 +709,7 @@ if st.session_state.get("analysis_done", False):
                         signal_raw = detect_array[sweep_idx, ch_idx, start_idx:end_idx]
                         
                         signal = sp.detrend(signal_raw)
-                        signal = lowpass(signal, fs, cutoff=40, order=4)
+                        signal = functions.lowpass(signal, fs, cutoff=40, order=4)
                         signal_down = sp.decimate(signal, downsample_factor, ftype='fir', zero_phase=True)
                         t = np.arange(len(signal_down)) / fs_down - duration_pre
                         
@@ -797,7 +786,7 @@ if st.session_state.get("analysis_done", False):
                 sig0_full = detect_array[sweep_idx, 0, :]
                 sig1_full = detect_array[sweep_idx, 1, :]
                 
-                start_idx, end_idx = find_best_segment_60s(sig0_full, sig1_full, fs, duration=60, step=10)
+                start_idx, end_idx = functions.find_best_segment_60s(sig0_full, sig1_full, fs, duration=60, step=10)
                 
                 step = 10
                 sig0_segment = sig0_full[start_idx:end_idx:step]
@@ -1192,7 +1181,7 @@ if st.session_state.get("analysis_done", False):
                 for ax, channel in zip(axes, channels_freq):
                     ch_idx = list(channels_freq).index(channel)
                     font_segment = detect_array_freq[0, ch_idx, :int(10 * fs)]
-                    xf, font_db = spectrum_db(font_segment, fs)
+                    xf, font_db = functions.spectrum_db(font_segment, fs)
                     ax.plot(xf, font_db, label='Background', color='#8c9aa6')
                     if not df_ictal.empty:
                         ictal_ch = df_ictal[df_ictal['channel'] == channel]
@@ -1202,7 +1191,7 @@ if st.session_state.get("analysis_done", False):
                             ictal_start_f = ictal_row['ictal_start']
                             ictal_start_idx_f = int((ictal_start_f + 2) * fs)
                             ictal_segment = detect_array_freq[ictal_sweep_idx, ch_idx, ictal_start_idx_f:ictal_start_idx_f + int(10 * fs)]
-                            _, ictal_db = spectrum_db(ictal_segment, fs)
+                            _, ictal_db = functions.spectrum_db(ictal_segment, fs)
                             ax.plot(xf, ictal_db, label='Ictal', color='#2B6E7A' if ch_idx == 0 else '#D97A5C', linewidth=1.5)
                     ax.set_xlim(0, 25)
                     ax.set_xlabel('Frequency (Hz)')
@@ -1240,7 +1229,7 @@ if st.session_state.get("analysis_done", False):
                         end_idx_w = int((ictal_start_w + duration_post) * fs)
                         signal_raw = detect_array_wavelet[sweep_idx_w, ch_idx_w, start_idx_w:end_idx_w]
                         signal = sp.detrend(signal_raw)
-                        signal = lowpass(signal, fs, cutoff=40, order=4)
+                        signal = functions.lowpass(signal, fs, cutoff=40, order=4)
                         signal_down = sp.decimate(signal, downsample_factor, ftype='fir', zero_phase=False)
                         t = np.arange(len(signal_down)) / fs_down - duration_pre
                         central_freq = pywt.central_frequency('morl')

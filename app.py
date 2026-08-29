@@ -89,7 +89,7 @@ if "ch1_name" not in st.session_state:
 st.markdown("<h1 style='text-align: center;'>🧠 EpiAnalyzer</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: gray;'>Epileptiform Activity Analysis Pipeline</p>", unsafe_allow_html=True)
 
-st.markdown("---")
+st.markdown("\n")
 
 with st.expander("Description"):
     
@@ -311,13 +311,13 @@ with st.sidebar.expander("Settings", expanded=False):
     
     new_gap = st.slider("Gap (s)", 0.5, 10.0, 
                         st.session_state.gap, step=0.5, key="slider_gap",
-                        help="Default: 2.0s. Higher = groups more distant spikes, Lower = splits events more")
+                        help="Default: 2.0s (EC-CA1). Higher = groups more distant spikes, Lower = splits events more")
     if new_gap != st.session_state.gap:
         st.session_state.gap = new_gap
     
     new_min_duration = st.slider("Minimum event duration (s)", 2.0, 30.0, 
                                  st.session_state.min_duration, step=1.0, key="slider_min_duration",
-                                 help="Default: 10.0s. Higher = longer events only, Lower = captures shorter bursts")
+                                 help="Default: 10.0s (EC-CA1). Higher = longer events only, Lower = captures shorter bursts")
     if new_min_duration != st.session_state.min_duration:
         st.session_state.min_duration = new_min_duration
     
@@ -329,13 +329,13 @@ with st.sidebar.expander("Settings", expanded=False):
     
     new_max_density = st.slider("Maximum average density (spikes/s)", 10.0, 80.0, 
                                 st.session_state.max_density, step=1.0, key="slider_max_density",
-                                help="Default: 40.0. Higher = allows denser bursts, Lower = excludes noise")
+                                help="Default: 40.0 (EC-CA1). Higher = allows denser bursts, Lower = excludes noise")
     if new_max_density != st.session_state.max_density:
         st.session_state.max_density = new_max_density
     
     new_min_peak_freq = st.slider("Minimum peak frequency (spikes/s)", 1.0, 10.0, 
                                   st.session_state.min_peak_freq, step=0.5, key="slider_min_peak_freq",
-                                  help="Default: 3.0 spikes/s. Events must reach this frequency in at least 2s window to be considered ictal. Higher = more selective.")
+                                  help="Default: 3.0 (EC-CA1). Events must reach this frequency in at least 2s window to be considered ictal. Higher = more selective.")
     if new_min_peak_freq != st.session_state.min_peak_freq:
         st.session_state.min_peak_freq = new_min_peak_freq
 
@@ -618,11 +618,15 @@ if st.session_state.get("analysis_done", False) and st.session_state.detect_path
                 ictal_ch = df_ictal[(df_ictal['sweep'] == sweep_to_view) & (df_ictal['channel'] == channel_name)] if not df_ictal.empty else pd.DataFrame()
 
                 n_spikes = int(summary_row['n_spikes'].values[0]) if not summary_row.empty else 0
+                mean_interictal_freq = float(summary_row['mean_interictal_freq'].values[0]) if not summary_row.empty else 0
                 n_ictal = int(summary_row['n_ictal'].values[0]) if not summary_row.empty else 0
                 n_interictal = int(summary_row['n_interictal'].values[0]) if not summary_row.empty else 0
                 mean_amp = float(summary_row['mean_amplitude'].values[0]) if not summary_row.empty else 0
                 max_amp = float(summary_row['max_amplitude'].values[0]) if not summary_row.empty else 0
                 ictal_spike_count = int(summary_row['ictal_spike_count'].values[0]) if not summary_row.empty else 0
+                ictal_amplitude = float(ictal_ch["ictal_amplitude"].values[0]) if not summary_row.empty else 0
+                interictal_amplitude = float(summary_row["interictal_amplitude"].values[0]) if not summary_row.empty else 0
+                sweep_duration_seconds = st.session_state.sweep_duration * 60
 
                 st.markdown(f"<h4 style='color: {colors[ch_idx]};'>● {channel_name}</h4>", unsafe_allow_html=True)
 
@@ -635,13 +639,17 @@ if st.session_state.get("analysis_done", False) and st.session_state.detect_path
                         
                         metrics = [
                             ("Total spikes", str(n_spikes)),
+                            ("Mean frequency", f"{n_spikes/sweep_duration_seconds:.2f} Hz"),
                             ("Ictal events", str(n_ictal)),
+                            ("Mean amplitude", f"{mean_amp:.2f} mV"),
                             ("Interictal spikes", str(n_interictal)),
-                            ("Mean amplitude", f"{mean_amp:.3f} mV"),
+                            ("Mean interictal frequency", f"{mean_interictal_freq:.2f} Hz" if n_interictal > 10 else "---"),
+                            ("Max amplitude", f"{max_amp:.2f} mV"),
+                            ("Mean interictal amplitude", f"{interictal_amplitude:.2f} mV"),
+                            ("Ictal spikes", str(ictal_spike_count)),
+                            ("Mean ictal frequency", f"{mean_ictal_freq:.2f} Hz"),
                             ("Total ictal duration", f"{total_ictal_dur:.1f} s"),
-                            ("Mean ictal frequency", f"{mean_ictal_freq:.1f} Hz"),
-                            ("Ictal spike count", str(ictal_spike_count)),
-                            ("Max amplitude", f"{max_amp:.3f} mV")
+                            ("Mean ictal amplitude", f"{ictal_amplitude:.2f} mV")
                         ]
                         
                         cols = st.columns(4)
@@ -651,13 +659,21 @@ if st.session_state.get("analysis_done", False) and st.session_state.detect_path
                     else:
                         metrics = [
                             ("Total spikes", str(n_spikes)),
+                            ("Mean frequency", f"{mean_interictal_freq:.2f} Hz" if n_interictal > 10 else "---"),
+                            ("Ictal events", str(n_ictal)),
+                            ("Mean amplitude", f"{mean_amp:.2f} mV"),
                             ("Interictal spikes", str(n_interictal)),
-                            ("Mean amplitude", f"{mean_amp:.3f} mV"),
-                            ("Max amplitude", f"{max_amp:.3f} mV")
+                            ("Mean interictal frequency", f"{mean_interictal_freq:.2f}" if n_interictal > 10 else "---"),
+                            ("Max amplitude", f"{max_amp:.2f} mV"),
+                            ("Mean interictal amplitude", f"{interictal_amplitude:.2f} mV"),
+                            ("Ictal spikes", "---"),
+                            ("Mean ictal frequency", "---"),
+                            ("Total ictal duration", "---"),
+                            ("Mean ictal amplitude", "---")
                         ]
-                        cols = st.columns(5)
+                        cols = st.columns(4)
                         for i, (label, value) in enumerate(metrics):
-                            with cols[i]:
+                            with cols[i % 4]:
                                 st.metric(label, value)
 
                 st.markdown("---")

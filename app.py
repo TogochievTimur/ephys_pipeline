@@ -371,6 +371,7 @@ def process_and_save_to_disk(sweeps, fs, lowcut, notch, order, q,
     detect_array = np.load(detect_path, mmap_mode='r+')
     
     for sweep_idx in range(n_sweeps):
+        
         for ch_idx in range(n_channels):
             raw = sweeps[sweep_idx][ch_idx].astype(np.float32)
             detect, measure = filter_both(raw)
@@ -615,7 +616,8 @@ if st.session_state.get("analysis_done", False) and st.session_state.detect_path
             for ch_idx in range(n_channels):
                 channel_name = labels[ch_idx]
                 summary_row = df_summary[(df_summary['sweep'] == sweep_to_view) & (df_summary['channel'] == channel_name)]
-                ictal_ch = df_ictal[(df_ictal['sweep'] == sweep_to_view) & (df_ictal['channel'] == channel_name)] if not df_ictal.empty else pd.DataFrame()
+                ictal_ch = df_ictal[(df_ictal['sweep'] == sweep_to_view) & 
+                                    (df_ictal['channel'] == channel_name)] if not df_ictal.empty else pd.DataFrame()
 
                 n_spikes = int(summary_row['n_spikes'].values[0]) if not summary_row.empty else 0
                 mean_interictal_freq = float(summary_row['mean_interictal_freq'].values[0]) if not summary_row.empty else 0

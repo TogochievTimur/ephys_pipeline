@@ -826,9 +826,9 @@ if (
                                 alpha=0.15,
                                 label="Ictal zone" if _ == ictal_ch.index[0] else "",
                             )
-                        ax.legend(loc="best", fontsize=8)
+                        ax.legend(loc="best", fontsize=12)
                     elif n_spikes > 0:
-                        ax.legend(loc="best", fontsize=8)
+                        ax.legend(loc="best", fontsize=12)
 
                 del detect_array
                 st.pyplot(fig)
@@ -1111,7 +1111,7 @@ if (
                 ax.set_xticklabels(sweep_labels[1:], rotation=45, fontsize=14)
                 ax.set_xlabel("Time interval (min)", labelpad=20)
                 ax.set_ylabel("Number of spikes", labelpad=10)
-                ax.legend()
+                ax.legend(fontsize=12)
                 ax.grid(True, alpha=0.3)
                 ax.set_xlim(1.5, n_sweeps + 0.5)
                 plt.tight_layout()
@@ -1218,7 +1218,7 @@ if (
                         ax.set_xlabel("Time interval (min)", labelpad=20)
                         ax.set_ylabel("Spike count", labelpad=10)
                         ax.set_title(f"{channel}")
-                        ax.legend()
+                        ax.legend(fontsize=12)
                     plt.tight_layout()
                     st.pyplot(fig)
                     plt.close(fig)
@@ -1227,7 +1227,8 @@ if (
 
         with subtab4:
             st.caption(
-                "Interictal spike counts per sweep, shown together for both channels to compare activity levels."
+                "Interictal spike counts per sweep, "
+                "shown together for both channels to compare activity levels."
             )
             with st.spinner("Plotting..."):
                 channels = df_summary["channel"].unique()
@@ -1249,7 +1250,7 @@ if (
                 ax.set_xticklabels(sweep_labels[1:], rotation=45, fontsize=14)
                 ax.set_xlabel("Time interval (min)", labelpad=20)
                 ax.set_ylabel("Interictal spikes", labelpad=10)
-                ax.legend()
+                ax.legend(fontsize=12)
                 ax.set_xlim(1.5, n_sweeps + 0.5)
                 plt.tight_layout()
                 st.pyplot(fig)
@@ -1314,7 +1315,7 @@ if (
                     ax.set_ylabel("Amplitude (mV)", labelpad=10)
                     ax.set_title(f"{channel}")
                     ax.grid(True, alpha=0.3)
-                    ax.legend()
+                    ax.legend(fontsize=12)
                 plt.tight_layout()
                 st.pyplot(fig)
                 plt.close(fig)
@@ -1408,7 +1409,7 @@ if (
 
                     xf, font_db = func.spectrum_db(font_segment, fs)
 
-                    ax.plot(xf, font_db, label="Background", color="#8c9aa6")
+                    ax.plot(xf, font_db, label="Background", color="#353F48")
 
                     if ictal_segment is not None:
                         _, ictal_db = func.spectrum_db(ictal_segment, fs)
@@ -1416,20 +1417,17 @@ if (
                             xf,
                             ictal_db,
                             label="Ictal",
-                            color=(
-                                st.session_state.color_ictal_amp
-                                if ch_idx == 0
-                                else st.session_state.color_ictal_duration
-                            ),
+                            color=colors[ch_idx],
                             linewidth=1.5,
                         )
 
                     ax.set_xlim(0, 25)
+                    ax.set_ylim(0 - np.max(ictal_db) / 15, np.max(ictal_db) * 1.5)
                     ax.set_xlabel("Frequency (Hz)")
-                    ax.set_ylabel("Power (dB)")
+                    ax.set_ylabel(r"Power ($\mu$V$^2$)")
                     ax.set_title(f"{channel}")
                     ax.grid(True, alpha=0.3)
-                    ax.legend(loc="lower left")
+                    ax.legend(fontsize=12)
 
                 plt.tight_layout()
                 st.pyplot(fig)
@@ -1811,14 +1809,18 @@ if (
 
         {f'Sweeps **{", ".join(map(str, ictal_sweeps_list))}** contain ictal events — long,'
          f'high-frequency discharges characteristic of seizure-like activity.'
-         if has_ictal else 'No ictal events were detected in any sweep. The recording appears to be interictal or quiescent.'}
+         if has_ictal else 'No ictal events were detected in any sweep. '
+         'The recording appears to be interictal or quiescent.'}
 
-        {f'**{labels[0]}** showed **{total_ictal_ch0} ictal event(s)** and **{total_interictal_ch0} interictal spikes**,'
-         f'while **{labels[1]}** showed **{total_ictal_ch1} ictal event(s)** and **{total_interictal_ch1} interictal spikes**.'
+        {f'**{labels[0]}** showed **{total_ictal_ch0} ictal event(s)** '
+         f'and **{total_interictal_ch0} interictal spikes**, '
+         f'while **{labels[1]}** showed **{total_ictal_ch1} ictal event(s)** '
+         f'and **{total_interictal_ch1} interictal spikes**.'
          if has_ictal else f'**{labels[0]}** recorded **{total_spikes_ch0} spikes** (all interictal), **{labels[1]}**'
          f'recorded **{total_spikes_ch1} spikes** (all interictal).'}
 
-        {f'**{labels[0]}** dominates with ictal activity, while **{labels[1]}** shows predominantly interictal spiking.'
+        {f'**{labels[0]}** dominates with ictal activity, '
+         f'while **{labels[1]}** shows predominantly interictal spiking.'
          f'This pattern is consistent with the expected EC–CA1 relationship,'
          f'where ictal events originate in EC and propagate to the hippocampus.'
          if total_ictal_ch0 > total_ictal_ch1 and 'EC' in labels and 'CA1' in labels else ''}
@@ -1840,8 +1842,10 @@ if (
 
             st.markdown(f"""
             **Ictal characteristics:**\n
-            Mean ictal frequency: **{mean_ictal_freq:.1f} Hz** (range: {min_ictal_freq:.1f}–{max_ictal_freq:.1f} Hz)\n
-            Mean ictal duration: **{mean_ictal_dur:.1f} s** (total: {total_ictal_dur:.0f} s across all sweeps)
+            Mean ictal frequency: **{mean_ictal_freq:.1f} Hz**
+            (range: {min_ictal_freq:.1f}–{max_ictal_freq:.1f} Hz)\n
+            Mean ictal duration: **{mean_ictal_dur:.1f} s**
+            (total: {total_ictal_dur:.0f} s across all sweeps)
             """)
 
         st.markdown(f"""
@@ -1850,7 +1854,8 @@ if (
         Mean amplitude in **{labels[1]}**: **{mean_amp_ch1:.3f} mV**\n
         {'The amplitude distribution (see Distribution plot in Time Analysis) '
         'shows the spread of values across sweeps.'
-        if total_spikes_ch0 + total_spikes_ch1 > 0 else 'No spikes were detected, so amplitude statistics are not available.'}
+        if total_spikes_ch0 + total_spikes_ch1 > 0 else 'No spikes were detected, '
+        'so amplitude statistics are not available.'}
 
         **Total spike counts:**\n
         **{labels[0]}**: {total_spikes_ch0} spikes{' — highly active' if total_spikes_ch0 > 1000 else ''}\n
@@ -1872,7 +1877,8 @@ if (
                 Max correlation: **{cc['max_corr']:.3f}** at lag **{lag_ms:.1f} ms**
                 Direction: **{direction}**
                 {'This indicates significant synchronized activity between the channels.'
-                 if cc['max_corr'] > 0.15 else 'The correlation is weak, suggesting limited coupling during interictal periods.'}
+                 if cc['max_corr'] > 0.15 else 'The correlation is weak, '
+                 'suggesting limited coupling during interictal periods.'}
                 """)
             else:
                 st.markdown(
@@ -2287,19 +2293,16 @@ if (
                                 xf,
                                 ictal_db,
                                 label="Ictal",
-                                color=(
-                                    st.session_state.color_ictal_amp
-                                    if ch_idx == 0
-                                    else st.session_state.color_ictal_duration
-                                ),
+                                color=colors[ch_idx],
                                 linewidth=1.5,
                             )
                     ax.set_xlim(0, 25)
+                    ax.set_ylim(0 - np.max(ictal_db) / 15, np.max(ictal_db) * 1.5)
                     ax.set_xlabel("Frequency (Hz)")
-                    ax.set_ylabel("Power (dB)")
+                    ax.set_ylabel(r"Power($mu$V$^2$)")
                     ax.set_title(f"{channel}")
                     ax.grid(True, alpha=0.3)
-                    ax.legend(loc="lower left")
+                    ax.legend(fontsize=12)
                 plt.tight_layout()
                 fig.savefig(
                     zip_file.open("freq_plots/spectral_power.png", "w"),

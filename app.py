@@ -1361,73 +1361,92 @@ if (
         st.header("Frequency Analysis")
         st.caption(
             "Frequency-domain and time–frequency representations: "
-            "FFT power spectra and wavelet spectrograms."
+            "FFT power spectral density and wavelet spectrograms."
         )
-        freq_subtab1, freq_subtab2 = st.tabs(["Spectral Power", "Wavelet Analysis"])
+        freq_subtab1, freq_subtab2 = st.tabs(
+            ["Power Spectral Density (PSD)", "Wavelet Analysis"]
+        )
 
         with freq_subtab1:
             st.caption(
-                "Power spectral density (FFT) comparing background activity and "
-                "an ictal segment (if available) for each channel."
+                "Power spectral density (PSD) demonstrating "
+                "a distribution between frequencies "
+                "in ictal discharge"
             )
 
             with st.spinner("Plotting..."):
 
-                duration = 10
-                segment_len = int(duration * fs)
+                channel_order = df_summary["channel"].unique()
+                ictal_channels = df_summary[df_summary["n_ictal"] > 0][
+                    "channel"
+                ].unique()
+                channels_dur = [ch for ch in channel_order if ch in ictal_channels]
 
-                channels = df_summary["channel"].unique()
-                n_channels_freq = len(channels)
+                if len(channels_dur) > 0 and not df_ictal.empty:
+                    n_plots = len(channels_dur)
+                    fig, axes = plt.subplots(n_plots, 1, figsize=(16, 6 * n_plots))
+                    fig.suptitle(
+                        "Power Spectral Density", fontsize=25, fontweight="bold"
+                    )
+                    if n_plots == 1:
+                        axes = [axes]
 
-                fig, axes = plt.subplots(
-                    n_channels_freq, 1, figsize=(16, 6 * n_channels_freq)
-                )
-                fig.suptitle("Spectral power", fontsize=25, fontweight="bold")
-                if n_channels_freq == 1:
-                    axes = [axes]
+                    detect_array = np.load(st.session_state.detect_path, mmap_mode="r")
 
-                detect_array = np.load(st.session_state.detect_path, mmap_mode="r")
+                    for ax, channel in zip(axes, channels_dur):
+                        ch_idx = list(channels).index(channel)
 
-                for ax, channel in zip(axes, channels):
-                    ch_idx = list(channels).index(channel)
+                        ictal_segment = None
+                        if not df_ictal.empty:
+                            ictal_ch = df_ictal[df_ictal["channel"] == channel]
+                            if not ictal_ch.empty:
+                                ictal_row = ictal_ch.iloc[0]
+                                ictal_sweep_idx = int(ictal_row["sweep"]) - 1
+                                ictal_start = ictal_row["ictal_start"]
+                                dur = ictal_row["duration"]
+                                mid_start = (
+                                    ictal_start + (dur / 2) - 5
+                                    if int(dur) < 25
+                                    else ictal_start + (dur / 2) - 10
+                                )
+                                ictal_start_idx = int(mid_start * fs)
+                                ictal_end_idx = (
+                                    int((mid_start + 10) * fs)
+                                    if int(dur) < 25
+                                    else int((mid_start + 20) * fs)
+                                )
+                                ictal_segment = detect_array[
+                                    ictal_sweep_idx,
+                                    ch_idx,
+                                    ictal_start_idx:ictal_end_idx,
+                                ]
 
-                    font_segment = detect_array[0, ch_idx, :segment_len]
-
-                    ictal_segment = None
-                    if not df_ictal.empty:
-                        ictal_ch = df_ictal[df_ictal["channel"] == channel]
-                        if not ictal_ch.empty:
-                            ictal_row = ictal_ch.iloc[0]
-                            ictal_sweep_idx = int(ictal_row["sweep"]) - 1
-                            ictal_start = ictal_row["ictal_start"]
-                            ictal_start_idx = int((ictal_start + 2) * fs)
-                            ictal_segment = detect_array[
-                                ictal_sweep_idx,
-                                ch_idx,
-                                ictal_start_idx : ictal_start_idx + segment_len,
-                            ]
-
-                    xf, font_db = func.spectrum_db(font_segment, fs)
-
-                    ax.plot(xf, font_db, label="Background", color="#353F48")
-
-                    if ictal_segment is not None:
-                        _, ictal_db = func.spectrum_db(ictal_segment, fs)
-                        ax.plot(
-                            xf,
-                            ictal_db,
-                            label="Ictal",
-                            color=colors[ch_idx],
-                            linewidth=1.5,
-                        )
-
-                    ax.set_xlim(0, 25)
-                    ax.set_ylim(0 - np.max(ictal_db) / 15, np.max(ictal_db) * 1.5)
-                    ax.set_xlabel("Frequency (Hz)")
-                    ax.set_ylabel(r"Power ($\mu$V$^2$)")
-                    ax.set_title(f"{channel}")
-                    ax.grid(True, alpha=0.3)
-                    ax.legend(fontsize=12)
+                        if ictal_segment is not None:
+                            xf, ictal_psd = func.spectrum(ictal_segment, fs)
+                            ictal_psd = (
+                                ictal_psd * 1e6
+                                if np.max(ictal_psd) < 1e4
+                                else ictal_psd
+                            )
+                            ax.plot(
+                                xf,
+                                ictal_psd,
+                                color=colors[ch_idx],
+                                linewidth=1.5,
+                            )
+                            ax.set_xlim(0, 25)
+                            ax.set_ylim(
+                                0 - np.max(ictal_psd) / 15, np.max(ictal_psd) * 1.5
+                            )
+                            ax.set_xlabel("Frequency (Hz)")
+                            ax.set_ylabel(
+                                r"PSD ($\mu$V$^2$/Hz)"
+                                if np.max(ictal_psd) < 1e4
+                                else r"PSD (mV$^2$/Hz)"
+                            )
+                            ax.set_title(f"{channel}")
+                            ax.grid(True, alpha=0.3)
+                            ax.legend(fontsize=12)
 
                 plt.tight_layout()
                 st.pyplot(fig)
@@ -1893,8 +1912,7 @@ if (
 
         st.markdown(
             "**Frequency analysis** (see Frequency Analysis tab) shows the spectral power distribution. "
-            "Background activity typically peaks at low frequencies, "
-            "while ictal segments show increased power across a broader range."
+            "Ictal segments show increased power across a broader range."
         )
 
         early_spikes = df_summary[df_summary["sweep"] <= n_sweeps // 3][
@@ -2271,41 +2289,58 @@ if (
 
                 detect_array_freq = np.load(st.session_state.detect_path, mmap_mode="r")
 
-                for ax, channel in zip(axes, channels_freq):
-                    ch_idx = list(channels_freq).index(channel)
-                    font_segment = detect_array_freq[0, ch_idx, : int(10 * fs)]
-                    xf, font_db = func.spectrum_db(font_segment, fs)
-                    ax.plot(xf, font_db, label="Background", color="#8c9aa6")
+                for ax, channel in zip(axes, channels):
+                    ch_idx = list(channels).index(channel)
+
+                    ictal_segment = None
                     if not df_ictal.empty:
                         ictal_ch = df_ictal[df_ictal["channel"] == channel]
                         if not ictal_ch.empty:
                             ictal_row = ictal_ch.iloc[0]
                             ictal_sweep_idx = int(ictal_row["sweep"]) - 1
-                            ictal_start_f = ictal_row["ictal_start"]
-                            ictal_start_idx_f = int((ictal_start_f + 2) * fs)
+                            ictal_start = ictal_row["ictal_start"]
+                            duration = ictal_row["duration"]
+                            ictal_start_idx = int(ictal_start * fs)
+                            ictal_end_idx = int((ictal_start + duration) * fs)
                             ictal_segment = detect_array_freq[
                                 ictal_sweep_idx,
                                 ch_idx,
-                                ictal_start_idx_f : ictal_start_idx_f + int(10 * fs),
+                                ictal_start_idx:ictal_end_idx,
                             ]
-                            _, ictal_db = func.spectrum_db(ictal_segment, fs)
+
+                            xf, ictal_psd = func.spectrum(ictal_segment, fs)
+                            ictal_psd = (
+                                ictal_psd * 1e6
+                                if np.max(ictal_psd) < 1e4
+                                else ictal_psd
+                            )
                             ax.plot(
                                 xf,
-                                ictal_db,
-                                label="Ictal",
+                                ictal_psd,
                                 color=colors[ch_idx],
                                 linewidth=1.5,
                             )
+                            ax.axvline(
+                                xf[np.argmax(ictal_psd)],
+                                color="r",
+                                linestyle="--",
+                                label="Max PSD",
+                            )
+
+                    psd_above_15 = ictal_psd[xf >= 15]
                     ax.set_xlim(0, 25)
-                    ax.set_ylim(0 - np.max(ictal_db) / 15, np.max(ictal_db) * 1.5)
+                    ax.set_ylim(0 - np.max(ictal_psd) / 15, np.max(ictal_psd) * 1.5)
                     ax.set_xlabel("Frequency (Hz)")
-                    ax.set_ylabel(r"Power($mu$V$^2$)")
+                    ax.set_ylabel(
+                        r"PSD ($\mu$V$^2$/Hz)"
+                        if np.max(ictal_psd) < 1e4
+                        else r"PSD (mV$^2$/Hz)"
+                    )
                     ax.set_title(f"{channel}")
                     ax.grid(True, alpha=0.3)
-                    ax.legend(fontsize=12)
                 plt.tight_layout()
                 fig.savefig(
-                    zip_file.open("freq_plots/spectral_power.png", "w"),
+                    zip_file.open("freq_plots/spectral_density.png", "w"),
                     dpi=300,
                     bbox_inches="tight",
                 )

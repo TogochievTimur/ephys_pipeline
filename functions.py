@@ -173,10 +173,10 @@ def detect_spikes_adaptive(
     return final_peaks, noise_level
 
 
-def spectrum_db(signal, fs):
+def spectrum(signal, fs):
     signal = signal - np.mean(signal)
-    freqs, psd = sp.periodogram(signal, fs=fs, window="boxcar", scaling="spectrum")
-    return freqs, psd * 1e6
+    freqs, psd = sp.periodogram(signal, fs=fs, window="hamming", scaling="density")
+    return freqs, psd
 
 
 def detect_ictal_events(
